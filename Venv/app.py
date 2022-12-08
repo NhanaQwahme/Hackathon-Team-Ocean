@@ -1,4 +1,4 @@
-from flask import Flask,request
+from flask import Flask,request,render_template
 import os
 import psycopg2
 from datetime import datetime,timezone
@@ -42,7 +42,7 @@ connection = psycopg2.connect(url)
 
 @app.route("/")
 def index():
-    return "Welcome to Team Ocean"
+    return render_template("index.html")
 
 # register
 @app.post("/api/register")
