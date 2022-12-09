@@ -11,20 +11,20 @@ from flask_bcrypt import Bcrypt
 # DATABASE 
 
 CREATE_USER_TABLE=(
-    "CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY,type TEXT ,name Text,job_title TEXT,job_type TEXT,email TEXT UNIQUE,password TEXT,token TEXT);"
+    "CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY,name Text NOT NULL,job_title TEXT NULL  ,email TEXT NOT NULL,password TEXT NOT NULL,token TEXT NULL, UNIQUE(email));"
 )
 
 CREATE_COMPANY_TABLE=(
-    "CREATE TABLE IF NOT EXISTS company(company_id SERIAL PRIMARY KEY,email TEXT,job_id INTEGER,company TEXT,industry TEXT,address TEXT,phone TEXT,employees_no INTEGER,website_url TEXT,password TEXT,UNIQUE(email));"
+    "CREATE TABLE IF NOT EXISTS company(company_id SERIAL PRIMARY KEY,email TEXT NOT NULL,job_id INTEGER,company TEXT NOT NULL,industry TEXT NOT NULL,address TEXT NOT NULL,phone TEXT NOT NULL,employees_no INTEGER,website_url TEXT,password TEXT NOT NULL,UNIQUE(email));"
     )
 
-CREATE_Collaboration_TABLE="""CREATE TABLE IF NOT EXISTS collaboration(collaboration_id SERIAL PRIMARY KEY,project_name TEXT,industry TEXT,date TIMESTAMP,FOREIGN KEY(company_id) REFERENCES users(id) ON DELETE CASCADE);"""
+CREATE_Collaboration_TABLE="""CREATE TABLE IF NOT EXISTS collaboration(collaboration_id SERIAL PRIMARY KEY,project_name TEXT NOT NULL,industry TEXT NOT NULL,date TIMESTAMP,FOREIGN KEY(company_id) REFERENCES users(id) ON DELETE CASCADE);"""
 
-CREATE_JOB_TABLE=("CREATE TABLE IF NOT EXISTS job(job_id SERIAL PRIMARY KEY,company_id  TEXT,email TEXT,title TEXT,working_hrs TEXT,job_type TEXT,industry TEXT,location TEXT,job_role TEXT,description TEXT,min_salary INTEGER,max_salary INTEGER,FOREIGN KEY(email) REFERENCES company(email) ON DELETE CASCADE);")
-INSERT_JOB_DATA=("INSERT INTO job(email,company_id,title,working_hrs,job_type,industry,location,job_role,description,min_salary,max_salary) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *;")
+CREATE_JOB_TABLE=("CREATE TABLE IF NOT EXISTS job(job_id SERIAL PRIMARY KEY,company_id  TEXT,email TEXT NOT NULL,title TEXT NOT NULL,working_hrs TEXT NOT NULL,job_type TEXT NOT NULL,industry TEXT NOT NULL,location TEXT NOT NULL,job_role TEXT NOT NULL,description TEXT NOT NULL,min_salary INTEGER NOT NULL,max_salary INTEGER NOT NULL,years_of_experience TEXT NOT NULL,FOREIGN KEY(email) REFERENCES company(email) ON DELETE CASCADE);")
+INSERT_JOB_DATA=("INSERT INTO job(email,company_id,title,working_hrs,job_type,industry,location,job_role,description,min_salary,max_salary,years_of_experience) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *;")
 
 LOGIN_USER=("SELECT * FROM users WHERE password=(%s) AND email =(%s);")
-INSERT_USER_RETURN_ID = "INSERT INTO users(type,name,email,password,job_title ,job_type,token) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id;"
+INSERT_USER_RETURN_ID = "INSERT INTO users(name,email,password,job_title,token) VALUES(%s,%s,%s,%s,%s) RETURNING id;"
 UPDATE_USER_RETURN_ID ="UPDATE users SET password=(%s) WHERE email=(%s) AND token=(%s)  RETURNING *;"
 INSERT_COMPANY_DATA=("INSERT INTO company(job_id,email,company,industry,address,phone,employees_no,website_url,password) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING company_id;")
 
@@ -50,17 +50,16 @@ def register():
     data=request.get_json() 
     name=data["name"]
     email=data["email"]
-    Type=data["type"]
     password=data['password']
     job_title=data["job_title"]
-    job_type=data["job_type"]
+    
     Token=data["token"]
     with connection:
         with connection.cursor() as cursor:
             cursor.execute(CREATE_USER_TABLE)
-            cursor.execute(INSERT_USER_RETURN_ID,(Type,name,email,password,job_title ,job_type,Token))
+            cursor.execute(INSERT_USER_RETURN_ID,(name,email,password,job_title ,Token))
             name_id=cursor.fetchone()
-    return {"id":name_id,"data":f"User added {Type,name,email,job_title ,job_type,password,Token} created. "},201
+    return {"id":name_id,"data":"User added"},201
 
     
     
@@ -75,10 +74,10 @@ def login():
             cursor.execute(LOGIN_USER,(password1,email))
             user_data=cursor.fetchall()[0]
             print(user_data)
-    return {"user":user_data[2]},200
+    return {"user":user_data[1]},200
     
 # reset password
-@app.put("/api/reset")
+@app.post("/api/reset")
 def rest_password():
     data=request.get_json()
     Token=data["token"]
@@ -86,11 +85,11 @@ def rest_password():
     password1=data["password"]
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute(f"UPDATE users SET password='{password1}' WHERE email='{email}' AND token='{Token}'  RETURNING *;"
+            cursor.execute(f"UPDATE users SET password='{password1}' WHERE email='{email}' OR token='{Token}'  RETURNING *;"
 )
             user_data=cursor.fetchone()
         
-            return {"id":user_data[0],"data":f"Password Updated Successfully"},200
+            return {"id":user_data,"data":"Password Updated Successfully"},200
     
 
 
@@ -121,10 +120,10 @@ def company():
 def companies():
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM company;")
-            user_data=cursor.fetchall()
-            print(user_data)
-    return {"data":user_data}
+            cursor.execute("SELECT company,address,employees_no,phone,industry,website_url,email FROM company ;")
+            user_data=cursor.fetchall() 
+            print(len(user_data[0]))
+            return {"data":user_data}
 
 
 # Search Jobs
@@ -160,10 +159,11 @@ def addJob():
     description=data["description"]
     min_salary=data["min_salary"]
     max_salary=data["max_salary"]
+    years_of_experience=data["years_of_experience"]
     with connection:
         with connection.cursor() as cursor:
             cursor.execute(CREATE_JOB_TABLE)
-            cursor.execute(INSERT_JOB_DATA,(email,company_id,title,working_hrs,job_type,industry,location,job_role,description,min_salary,max_salary))
+            cursor.execute(INSERT_JOB_DATA,(email,company_id,title,working_hrs,job_type,industry,location,job_role,description,min_salary,max_salary,years_of_experience))
             user_data=cursor.fetchall()[0]
             print(user_data)
     return {"data":user_data}
@@ -176,17 +176,26 @@ def donate():
     cause_donating_to=data["cause_donating_to"]
     target_amount=data["target_amount"]
     amount=data["amount"]
-    donation_d=data['donation_d']
+    donation_info=data['donation_info']
     date=data['date']
     created_by=data["created_by"]
     donation_type=data["donation_type"]
+    image_url=data["image_url"]
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+    "CREATE TABLE IF NOT EXISTS donate(donation_id SERIAL PRIMARY KEY, cause_donating_to TEXT NOT NULL,target_amount INTEGER NOT NULL,amount INTEGER,donation_info TEXT NOT NULL,donation_type TEXT NOT NULL,image_url TEXT NOT NULL);"
+)
+            cursor.execute(f"INSERT INTO donate(cause_donating_to,target_amount,amount,donation_info,donation_type,image_url) VALUES ('{cause_donating_to}',{target_amount},{amount},'{donation_info}','{donation_type}','{image_url}') RETURNING *;")
+            user_data=cursor.fetchall()[0]
+    print(user_data)
+    return {"data":user_data}
 
 @app.get("/api/donations")
 def donations():
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute()
-            cursor.execute()
+            cursor.execute("select * from donate;")
             user_data=cursor.fetchall()[0]
             print(user_data)
     return {"data":user_data}
