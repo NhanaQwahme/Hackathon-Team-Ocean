@@ -118,9 +118,13 @@ def company():
 # fetch companies
 @app.get("/api/companies")
 def companies():
+    data=request.get_json()
+    company=data["company"]
+    address=data["address"]
+    industry=data["industry"]
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT company,address,employees_no,phone,industry,website_url,email FROM company ;")
+            cursor.execute(f"SELECT * FROM company WHERE company ='{company}' OR address =  '{address}' OR industry ='{industry}';")
             user_data=cursor.fetchall() 
             print(len(user_data[0]))
             return {"data":user_data}
@@ -176,26 +180,32 @@ def donate():
     cause_donating_to=data["cause_donating_to"]
     target_amount=data["target_amount"]
     amount=data["amount"]
-    donation_info=data['donation_info']
-    date=data['date']
+    donation_info=data["donation_info"]
+    date=data["date"]
     created_by=data["created_by"]
     donation_type=data["donation_type"]
     image_url=data["image_url"]
     with connection:
         with connection.cursor() as cursor:
             cursor.execute(
-    "CREATE TABLE IF NOT EXISTS donate(donation_id SERIAL PRIMARY KEY, cause_donating_to TEXT NOT NULL,target_amount INTEGER NOT NULL,amount INTEGER,donation_info TEXT NOT NULL,donation_type TEXT NOT NULL,image_url TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS donate(donation_id SERIAL PRIMARY KEY, cause_donating_to TEXT NOT NULL,target_amount INTEGER NOT NULL,amount INTEGER,donation_info TEXT NOT NULL,donation_type TEXT NOT NULL,image_url TEXT NOT NULL,date TEXT NOT NULL,created_by TEXT NOT NULL );"
 )
-            cursor.execute(f"INSERT INTO donate(cause_donating_to,target_amount,amount,donation_info,donation_type,image_url) VALUES ('{cause_donating_to}',{target_amount},{amount},'{donation_info}','{donation_type}','{image_url}') RETURNING *;")
+            cursor.execute(f"INSERT INTO donate(cause_donating_to,target_amount,amount,donation_info,donation_type,image_url,date,created_by) VALUES ('{cause_donating_to}',{target_amount},{amount},'{donation_info}','{donation_type}','{image_url}','{date}','{created_by}') RETURNING *;")
             user_data=cursor.fetchall()[0]
     print(user_data)
     return {"data":user_data}
 
 @app.get("/api/donations")
 def donations():
+    data=request.get_json()
+    amount=data["amount"]
+    date=data['date']
+    created_by=data["created_by"]
+    donation_type=data["donation_type"]
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute("select * from donate;")
+            cursor.execute(f"SELECT * FROM donate WHERE amount={amount} OR date='{date}' OR  created_by='{created_by}' OR donation_type='{donation_type}';")
+
             user_data=cursor.fetchall()[0]
             print(user_data)
     return {"data":user_data}
