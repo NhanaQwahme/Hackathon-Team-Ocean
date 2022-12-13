@@ -207,7 +207,8 @@ def donations():
             cursor.execute(f"SELECT * FROM donate WHERE amount={amount} OR date='{date}' OR  created_by='{created_by}' OR donation_type='{donation_type}';")
 
             user_data=cursor.fetchall()[0]
-            print(user_data)
+            print(user_data,"DATA")
+
     return {"data":user_data}
 
 
